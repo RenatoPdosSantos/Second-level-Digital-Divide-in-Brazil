@@ -1589,24 +1589,6 @@ DataLPCC <- function(datafile, iYear) {
         range <- "--"
       }
     
-  RPushbullet::pbPost(
-    type = "note",
-    title = paste(deparse(substitute(datafile)), 
-                  "finished!"),
-    body = paste(
-      "bw =",
-      formatC(Bandwidth, format = "E", 1),
-      "n= ",
-      n,
-      "; share = ",
-      share,
-      "; range = ",
-      range
-    ),
-    apikey = "o.SYjKv7goGyRzOWif4k8hwA6wPw1Hg00q",
-    devices = "Galaxy A8"
-  )
-  
   return(list(Year = iYear,
               LPCC = LPCC,
               n = n,
@@ -1762,8 +1744,6 @@ xlsx::write.xlsx(
     row.names = FALSE,
     col.names = TRUE
 )
-
-save.image("~/My Work/Meus trabalhos/Computers & Education/Evidence of a Second-level Digital Divide/.RData")
 
 ```
 
