@@ -1,0 +1,2393 @@
+---
+title: "Evidence of a Second-level Digital Divide in Internet Searches in Brazil"
+author: "Renato P. dos Santos"
+date: "23 de junho de 2020"
+output: 
+  pdf_document: default
+  word_document: default
+---
+##Abstract
+While the use of the Internet became ubiquitous in students' lives, mainly for entertainment purposes, access in schools has been drastically reduced in Brazil. Unlike previous studies, this research used choropleth maps to analyze graphically the actual usage of youth-oriented educational and entertainment websites in Brazil in the period 2005-2015 by region and social class to veri-fy whether the increasing Internet access helps to reproduce or close those educational inequalities. Results suggest that by removing the much-needed cultivation of the technological capital in its students, the school system in Brazil is failing to play its crucial role in helping reduce the widening of a second-level digital divide. Brazilian policymakers should incentivize school-based digital activities and behaviors that promote more productive Internet uses.
+##Keywords: Brazil, Google Trends, Internet access, Second-level Digital Divide, Web searches studies
+
+##Introduction
+The so-called information technology (ICT) revolution is mainly due to the increasing availability of personal computers and the consequent extraordinary growth of people's access to the Internet. However, this access has not been egalitarian and has widened the gap between those who have access to information and communication technologies and those who, for socioeconomic or geographical reasons, do not have it, which is referred to by the term 'digital divide'. This concept may apply to the gap in Internet access between industrialised and developing societies, called "global divide", or the gap in Internet access between rich and poor in the same country, called social divide (OECD, 2001). Since this unequal access to the Internet is widely considered to be the creator of a new class division between the "information rich" and the "information poor" (Everett, 1998), both global and social forms of digital inequality have attracted the attention of policy makers and researchers in social development, political change, and economic growth (Mour?o & Wood, 2015).
+
+```{r WScleaning, echo = FALSE, warning = FALSE}
+# Clean up workspace
+rm(list=ls())
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r environment, echo = FALSE, warning = FALSE}
+# Environment Details
+RVersion <- sessionInfo()$R.version$version.string
+#RStudioVersion <- RStudio.Version()$version
+OSVersion <- sessionInfo()$running
+platform <- sessionInfo()$platform
+RStudioVersion <- RStudio.Version()$version
+```
+
+```{r silentLoad, echo = FALSE}
+silentLoad <- function(pckg) {
+  if (!(pckg %in% available.packages())) {
+    return(paste("package",
+                 pckg,
+                 "not available!"))
+  }
+  if (!(pckg %in% installed.packages())) {
+    suppressMessages(install.packages(pckg))
+  }
+  suppressMessages(library(pckg,
+                           character.only = TRUE))
+}
+```
+
+```{r packages, echo = FALSE, warning = FALSE}
+# silentLoad("basicTrendline") # Add Trendline and Confidence Interval of Basic Regression Models to Plot
+silentLoad("Cairo") # Library for  high-quality output
+# silentLoad("colorRamps") # Buplyilds color tables
+# silentLoad("cowplot")  # Streamlined plot theme and plot annotations for 'ggplot2'
+# silentLoad("descr") # Descriptive Statistics
+# silentLoad("dplyr") # A grammar of data manipulation
+silentLoad("ggplot2") # Elegant data visualisations using the grammar of graphics
+# silentLoad("ggsn") # North Symbols and Scale Bars for Maps Created with 'ggplot2' or 'ggmap'
+# silentLoad("ggpubr") # Arrange multiple ggplots on the same page
+# silentLoad("gridExtra") # Arrange multiple grid-based plots on a page, and draw tables
+# silentLoad("lctools") # Tools for key spatial statistics and spatial analysissilentLoad("lctools")
+# silentLoad("rgdal") # Bindings for the Geospatial Data Abstraction Library
+# silentLoad("rgeos") # Interface to Geometry Engine - Open Source ('GEOS')
+# silentLoad("scales") # Scale functions for visualization
+# silentLoad("stats") #  Functions for statistical calculations
+# silentLoad("tidyr") # Data tidying
+
+```
+
+```{r readingFunctions, echo = FALSE}
+readTrendData <- function(datafilename) {
+  
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      stringsAsFactors = FALSE
+    )
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetAccessClassData <- function(datafilename) {
+  
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      skip = 2,
+      na.strings = "-",
+      stringsAsFactors = FALSE
+    )
+  
+  # Transforms class columns into a single column
+  data <-
+    as.data.frame(tidyr::pivot_longer(data,
+                                      names_to = "Class",
+                                      values_to = "% of households", 
+                                      -1)
+                  )
+  data$`% of households` <- 
+    as.numeric(data$`% of households`)
+  
+  # Translates column name
+  data <- plyr::rename(data,
+                       replace = 
+                         c("Anos" = "Year")
+                       )
+  data$Year = as.integer(data$Year)
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetAccessRegionData <- function(datafilename) {
+  
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      skip = 2,
+      na.strings = "-",
+      stringsAsFactors = FALSE
+    )
+  
+  # Translates column names
+  data <- plyr::rename(
+    data,
+    replace = c(
+      "Anos" = "Year",
+      "Nordeste" = "Northeast",
+      "Sudeste" = "Southeast",
+      "Sul" = "South",
+      "Norte" = "North",
+      "Centro.Oeste" = "Midwest"
+    )
+  )
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(tidyr::pivot_longer(data,
+                                            names_to = "Region",
+                                            values_to = "% of households",
+                                            -1)
+                        )
+  data$`% of households` <- 
+    as.numeric(data$`% of households`)
+  
+  data$Year = as.integer(data$Year)
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+readComputersPlaceData <- function(datafilename, year) {
+  # Reads the datafile
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      skip = 2,
+      stringsAsFactors = FALSE
+    )
+  
+  # Name first column as Region
+  names(data)[1] <- "Region"
+  
+  data$Region[trimws(data$Region) == "Nordeste"] = "Northeast"
+  data$Region[trimws(data$Region) == "Sudeste"] = "Southeast"
+  data$Region[trimws(data$Region) == "Sul"] = "South"
+  data$Region[trimws(data$Region) == "Norte / Centro-Oeste"] = "North / Midwest"
+  
+  # Translates column names
+  data <-
+    plyr::rename(
+      data,
+      replace = c(
+        "Sala.do.coordenador.pedagógico.ou.do.diretor" =
+          "Pedagogical coordinator's or principal's room",
+        "Sala.do.a..coordenador.a..pedagógico.a..ou.do.a..diretor.a." =
+          "Pedagogical coordinator's or principal's room",
+        "Sala.dos.professores.ou.de.reunião" =
+          "Teachers' or meeting room",
+        "Sala.dos.professores.ou.sala.de.reunião" =
+          "Teachers' or meeting room",
+        "Biblioteca.ou.sala.de.estudos" =
+          "Library or study room",
+        "Biblioteca.ou.sala.de.estudos.para.os.alunos" =
+          "Library or study room",
+        "Laboratório.de.informática" =
+          "Computer lab",
+        "Sala.de.aula" =
+          "Classroom"
+      ),
+      warn_missing = FALSE
+    )
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(tidyr::pivot_longer(data,
+                                            names_to = "Place", 
+                                            values_to = "% of schools",
+                                            -1)
+                        )
+  data$`% of schools` <- 
+    as.numeric(data$`% of schools`)
+  
+  # Includes new column Region
+  data <- dplyr::mutate(data,
+                        Year = as.integer(year))
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetAccessDeviceData <- function(datafilename, year) {
+  
+  # Reads the datafile
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      skip = 2,
+      stringsAsFactors = FALSE
+    )
+  
+  # Name first column as Region
+  names(data)[1] <- "Region" 
+  
+  data$Region[trimws(data$Region) == "Nordeste"] = "Northeast"
+  data$Region[trimws(data$Region) == "Sudeste"] = "Southeast"
+  data$Region[trimws(data$Region) == "Sul"] = "South"
+  data$Region[trimws(data$Region) == "Centro-Oeste e Norte"] = "North / Midwest"
+  
+  # Translates column names
+  data <-
+    plyr::rename(
+      data,
+      replace = c(
+        "Computador" = "Desktop",
+        "Notebook" = "Laptop",
+        "Videogame" = "Video game console",
+        "Televisão" = "TV set",
+        "Celular" = "Cellphone" 
+      ),
+      warn_missing = FALSE
+    )
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(tidyr::pivot_longer(data,
+                                            names_to = "Device", 
+                                            values_to = "% of users", 
+                                            -1)
+                        )
+  data$`% of users` <- 
+    as.numeric(data$`% of users`)
+
+  # Includes new column Region
+  data <- dplyr::mutate(data, 
+                        Year = as.integer(year))
+
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetAccessActivity <- function(datafilename, year) {
+  
+  # Reads the datafile
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      skip = 2,
+      stringsAsFactors = FALSE
+    )
+  
+  # Name first column as Year
+  names(data)[1] <- "Region" 
+  
+  data$Region[trimws(data$Region) == "Nordeste"] = "Northeast"
+  data$Region[trimws(data$Region) == "Sudeste"] = "Southeast"
+  data$Region[trimws(data$Region) == "Sul"] = "South"
+  data$Region[trimws(data$Region) == "Centro-Oeste e Norte"] = "North / Midwest"
+  
+  # Translates column names
+  data <- plyr::rename(
+    data,
+    replace = c(
+      "Trabalho.escolar" = 
+        "Doing homework",
+      "Assistir.vídeos..programas..filmes.ou.séries" = 
+        "Watching movies, shows or series",
+      "Ouvir.músicas" = 
+        "Listening to music",
+      "Redes.sociais" = 
+        "Accessing social networks",
+      "Mensagens.instantâneas" = 
+        "Sending instant messages",
+      "Jogar.em.grupo" = 
+        "Gaming in group",
+      "Pesquisar" = 
+        "Doing searches",
+      "Jogar.sozinho" =
+        "Gaming alone"
+    ),
+    warn_missing = FALSE
+  )
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(tidyr::pivot_longer(data,
+                                            names_to = "Activity", 
+                                            values_to = "% of users", 
+                                            -1)
+                        )
+  data$`% of users` <- 
+    as.numeric(data$`% of users`)
+
+  # Includes new column Region
+  data <- dplyr::mutate(data, 
+                        Year = as.integer(year))
+
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetAccessPlace <- function(datafilename, year) {
+  
+  # Reads the datafile
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      skip = 2,
+      stringsAsFactors = FALSE
+    )
+  
+  # Name first column as Region
+  names(data)[1] <- "Region"
+  
+  data$Region[trimws(data$Region) == "Nordeste"] = "Northeast"
+  data$Region[trimws(data$Region) == "Sudeste"] = "Southeast"
+  data$Region[trimws(data$Region) == "Sul"] = "South"
+  data$Region[trimws(data$Region) == "Centro-Oeste e Norte"] = "North / Midwest"
+  
+  # Translates column names
+  data <- plyr::rename(
+    data,
+    replace = c(
+      "Na.escola" =
+        "School",
+      "Escola" =
+        "School",
+      "Na.casa.de.outra.pessoa" =
+        "Someone else's house",
+      "Casa.de.outra.pessoa" =
+        "Someone else's house",
+      "Na.casa.de.amigos" =
+        "In friend's house",
+      "Na.casa.de.parentes" =
+        "In relative's house",
+      "Centro.público.de.acesso.pago" =
+        "In a lanhouse",
+      "Na.lanhouse.ou.cybercafé" =
+        "In a lanhouse",
+      "Em.uma.lanhouse" =
+        "In a lanhouse",
+      "Numa.biblioteca.pública" =
+        "In a library",
+      "telecentro.ou.em.outro.local.público" =
+        "Free public access",
+      "Centro.público.de.acesso.gratuito" =
+        "Free public access",
+      "Em.outros.lugares.como.por.exemplo.shopping.igreja.ou.lanchonete" =
+        "In other public place",
+      "Em.um.telecentro" =
+        "Free public access",
+      "Outro.lugar" =
+        "Other", 
+      "Outro" =
+        "Other", 
+      "Em.casa" =
+        "Home",
+      "Casa" =
+        "Home",
+      "Na.sala.de.casa.ou.outro.lugar.que.não.seja.o.quarto" = 
+        "In the living room",
+      "Na.sala.da.casa..ou.outro.espaço.coletivo.da.casa." = 
+        "In the living room",
+      "No.seu.quarto..ou.outro.quarto.da.casa." =
+        "In the room",
+      "No.quarto" =
+        "In the room",
+      "Em.deslocamento" =
+        "On the move",
+      "Na.rua.ou.qualquer.outro.lugar.pelo.celular" =
+        "On the move"
+    ), 
+    warn_missing = FALSE
+    )
+  
+  # Reduces number of categories
+  if ("In the room" %in% colnames(data) &
+      "In the living room" %in% colnames(data)) {
+    data$`Home` <-
+      pmax(data$`In the room`, 
+           data$`In the living room`)
+    data$`In the room` <-  NULL
+    data$`In the living room` <- NULL
+  } 
+  if ("In friend's house" %in% colnames(data) &
+      "In relative's house" %in% colnames(data)) {
+    data$`Someone else's house` <-
+      pmax(data$`In friend's house`, 
+           data$`In relative's house`)
+    data$`In friend's house` <-  NULL
+    data$`In relative's house` <- NULL
+  } 
+  if ("Free public access" %in% colnames(data) &
+      "In other public place" %in% colnames(data)) {
+    data$`Free public access` <-
+      pmax(data$`Free public access`, 
+           data$`In other public place`)
+    data$`In other public place` <- NULL
+  } 
+  if ("Free public access" %in% colnames(data) &
+      "In a library" %in% colnames(data)) {
+    data$`Free public access` <-
+      pmax(data$`Free public access`, 
+           data$`In a library`)
+    data$`In a library` <- NULL
+  } 
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(
+    tidyr::pivot_longer(data,
+                        names_to = "Place",
+                        values_to = "% of users",
+                        -1)
+                        )
+  data$`% of users` <- 
+    as.numeric(data$`% of users`)
+ 
+  # Includes new column Region
+  data <- dplyr::mutate(data,
+                        Year = as.integer(year))
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+readInternetUseData <- function(datafilename) {
+  
+  # Reads the datafile
+  data <-
+    utils::read.csv(
+      file = paste0("data/", datafilename, ".", "csv"),
+      header = TRUE,
+      sep = ",",
+      na.strings = "-",
+      skip = 0,
+      stringsAsFactors = FALSE
+    )
+  
+  data <- plyr::rename(data,
+                 replace = c(
+                   "X2005" = "2005",
+                   "X2008" = "2008",
+                   "X2011" = "2011",
+                   "X2013" = "2013"
+                   ),
+                 warn_missing = FALSE
+                 )
+  
+  # Transforms places columns into a single column
+  data <- as.data.frame(tidyr::pivot_longer(data,
+                                            names_to = "Year", 
+                                            values_to = "Frequency", 
+                                            -1)
+                        )
+  data$Year <- 
+    as.integer(data$Year) 
+
+  data$Frequency <- as.numeric(data$Frequency)
+  data <- dplyr::select(data, Year, everything())
+  
+  # Returns the transformed dataset
+  data
+  
+}
+
+```
+
+```{r plotFunctions, echo = FALSE}
+
+plotData <- function(datafile, YVariable, GVariable, nLegRows = 0, figfilename) {
+
+  data <- datafile
+  
+  # Defines data source and axis variables
+  thisGraph <-
+    ggplot(data, 
+           aes_(quote(Year), 
+                as.name(YVariable),
+                group = as.name(GVariable)
+                )
+           )
+  
+  # Draws graph lines
+  thisGraph <- thisGraph +
+    geom_line(aes_(colour = as.name(GVariable)),
+              size = 1,
+              na.rm = TRUE)
+  
+  # Adds shapes to graph lines
+  thisGraph <- thisGraph +
+    geom_point(aes_(colour = as.name(GVariable), 
+                    shape = as.name(GVariable)),
+               size = 3,
+               na.rm = TRUE)
+
+  # Customizes graph aesthetics
+  minYear <- min(dplyr::select(datafile, Year))
+  maxYear <- max(dplyr::select(datafile, Year))
+  yearBreaks <- unique(dplyr::select(datafile, Year))
+  yearBreaks <- as.array(yearBreaks$Year)
+  thisGraph <- thisGraph +
+    theme_classic() +
+    scale_x_continuous("Year",
+                       breaks = yearBreaks) +
+    scale_y_continuous(YVariable, 
+                       limits = c(0, 100)) +
+    theme(
+      panel.border = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(size = 9),
+      axis.title = element_text(size = 11, face = "bold"),
+      plot.title = element_text(
+        hjust = 0.5,
+        size = 14,
+        face = "bold"
+      ),
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12, 
+                                  face = "bold"),
+      legend.position = "bottom"
+    )
+
+  # Breaks legend into nLegRows rows
+  if(nLegRows > 0) {
+    thisGraph <- thisGraph +
+      guides(col = guide_legend(nrow = nLegRows))
+  }
+  
+  # Connects to 'png' device for saving plot as .png a file
+  CairoPNG(
+    filename = paste0("images/", 
+                      figfilename, 
+                      ".", 
+                      "png"),
+    width = 3600,
+    height = 3600,
+    dpi = 600,
+    bg = "white"
+  )
+  
+  # Draws the final plot to device
+  plot(thisGraph)
+  
+  # Closes connection to 'png' device
+  dev.off()
+
+}
+
+plotRegionalData <- function(datafile, YVariable, GVariable, filterValue = NULL, nLegRows = 0) {
+
+  # Subsets relevant data
+  if (length(filterValue) > 0) {
+    data <- dplyr::filter(datafile, Region == filterValue)
+    data <- dplyr::select(data, -matches("Region"))
+  } else
+  data <- datafile
+
+  # Defines data source and axis variables
+  thisGraph <-
+    ggplot(data, aes_(quote(Year), as.name(YVariable),
+                      group = as.name(GVariable)))
+  
+  thisGraph <- thisGraph +
+    ggtitle(filterValue)
+  
+  # Draws graph lines
+  thisGraph <- thisGraph +
+    geom_line(aes_(colour = as.name(GVariable)),
+              size = 1,
+              na.rm = TRUE)
+  
+  # Adds shapes to graph lines
+  thisGraph <- thisGraph +
+    geom_point(aes_(colour = as.name(GVariable), 
+                    shape = as.name(GVariable)),
+               size = 3,
+               na.rm = TRUE)
+
+  # Customizes graph aesthetics
+  thisGraph <- thisGraph +
+    theme_classic() +
+    # scale_x_discrete("Year") +
+    scale_y_continuous(YVariable, limits = c(0, 100)) +
+    theme(
+      panel.border = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(size = 9),
+      axis.title = element_text(size = 11, 
+                                face = "bold"),
+      plot.title = element_text(
+        hjust = 0.5,
+        size = 14,
+        face = "bold"
+      ),
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12, 
+                                  face = "bold"),
+      legend.position = "bottom"
+    )
+
+  # Breaks legend into nLegRows rows
+  if (nLegRows == 0)
+    thisGraph <- thisGraph +
+    theme(legend.position = "none")
+    else {
+    thisGraph <- thisGraph +
+    guides(col = guide_legend(nrow = nLegRows))
+    }
+  
+  # Returns the final plot
+  thisGraph
+  
+}
+
+plotRegionalGrid <- function(datafile, YVariable, GVariable, nLegRows, figfilename) {
+
+  # Make regional plots
+  pNE <- plotRegionalData(datafile, YVariable, GVariable, "Northeast", nLegRows)
+  pNM <- plotRegionalData(datafile, YVariable, GVariable, "North / Midwest", nLegRows)
+  pS <- plotRegionalData(datafile, YVariable, GVariable, "South", nLegRows)
+  pSE <- plotRegionalData(datafile, YVariable, GVariable, "Southeast", nLegRows)
+  
+  thisGraph <- ggpubr::ggarrange(pNE, pNM, pS, pSE, 
+            ncol = 2, nrow = 2,
+            common.legend = TRUE,
+            legend = "bottom"
+  )
+  
+  # Connects to 'png' device for saving plot as .png a file
+  CairoPNG(
+    filename = paste0("images/", 
+                      figfilename, 
+                      ".", 
+                      "png"),
+    width = 3600,
+    height = 3600,
+    dpi = 600,
+    bg = "white"
+  )
+  
+  # Draws the final plot to device
+  plot(thisGraph)
+  
+  # Closes connection to 'png' device
+  dev.off()
+
+}
+
+plotSearchData <- function(datafile, plotTitle) {
+
+  # Defines data source and axis variables
+  thisGraph <-
+    ggplot(datafile, 
+           aes(Year, Frequency),
+           group = State)
+  
+  thisGraph <- thisGraph +
+    ggtitle(plotTitle)
+  
+  # Draws graph lines
+  thisGraph <- thisGraph +
+    geom_line(aes(colour = State),
+              size = 1,
+              na.rm = TRUE)
+  
+  # Customizes graph aesthetics
+  thisGraph <- thisGraph +
+    theme_classic() +
+    # scale_x_discrete("Year") +
+    scale_y_continuous("Relative search volume", 
+                       limits = c(0, 100)) +
+    theme(
+      panel.border = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(size = 9),
+      axis.title = element_text(size = 11, 
+                                face = "bold"),
+      plot.title = element_text(hjust = 0.5,
+                                size = 14,
+                                face = "bold"),
+      legend.text = element_text(size = 10),
+      legend.title = element_text(size = 12, 
+                                  face = "bold"),
+      legend.position = "bottom"
+    ) +
+    guides(col = guide_legend(nrow = 4))
+
+  # Returns the final plot
+  thisGraph
+  
+}
+
+plotComparativeData <- function(datafileTL,
+                                plotTitleTL,
+                                datafileBL,
+                                plotTitleBL,
+                                datafileTR,
+                                plotTitleTR,
+                                datafileBR,
+                                plotTitleBR,
+                                figfilename) {
+
+  # Make regional plots
+  pTL <- plotSearchData(datafileTL, plotTitleTL)
+  pBL <- plotSearchData(datafileBL, plotTitleBL)
+  pTR <- plotSearchData(datafileTR, plotTitleTR)
+  pBR <- plotSearchData(datafileBR, plotTitleBR)
+  
+  thisGraph <- ggpubr::ggarrange(pTL, pTR, pBL, pBR, 
+            ncol = 2, nrow = 2,
+            common.legend = TRUE,
+            legend = "bottom"
+  )
+  
+  # Connects to 'png' device for saving plot as .png a file
+  CairoPNG(
+    filename = paste0("images/", 
+                      figfilename, 
+                      ".", 
+                      "png"),
+    width = 3600,
+    height = 3600,
+    dpi = 600,
+    bg = "white"
+  )
+  
+  # Draws the final plot to device
+  plot(thisGraph)
+  
+  # Closes connection to 'png' device
+  dev.off()
+
+}
+
+scatterPlot <- function(ydatafile,
+                        Year,
+                        yaxisLabel, 
+                        plotTitle = NULL) {
+  
+  plotData <- merge(
+    dplyr::filter(useOfInternet[,
+                                c("State",
+                                  "Frequency")],
+                  Year == Year),
+    dplyr::filter(ydatafile[, c("State",
+                                "Frequency")],
+                  Year == Year),
+    by = "State"
+  )
+  
+  thisPlot <- ggplot(plotData,
+                     aes(x = Frequency.x, 
+                         y = Frequency.y),
+                     na.rm = TRUE
+                     )
+  
+  thisPlot <- thisPlot +
+    geom_point(
+      colour = "blue",
+      size = 0.5,
+      alpha = 0.2,
+      na.rm = TRUE
+    ) +
+    stat_ellipse(size = 0.2, na.rm = TRUE)
+  
+  thisPlot <- thisPlot +
+    xlim(0, 75)
+  
+  if (!is.null(plotTitle)) {
+    thisPlot <- thisPlot +
+      ggtitle(plotTitle)
+  }
+  
+  thisPlot <- thisPlot +
+    labs(x = "% of users of Internet",
+         y = paste("Searches for",
+                   yaxisLabel))
+  
+  thisPlot <- thisPlot + theme_bw() +
+    theme(
+      panel.border = element_blank(),
+      panel.grid.major =
+        element_line(colour = "grey80"),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(size = 9),
+      axis.title =
+        element_text(size = 11, face = "bold")
+    )
+  
+  thisPlot
+  
+}
+
+plotComparativeScat <-
+  function(plotDataTL,
+           yaxisLabelTL,
+           plotDataTR,
+           yaxisLabelTR,
+           plotDataML,
+           yaxisLabelML,
+           plotDataMR,
+           yaxisLabelMR,
+           plotDataBL,
+           yaxisLabelBL,
+           Year,
+           figfilename) {
+    # Make scatter plots
+    pTL <- scatterPlot(plotDataTL, Year,
+                       yaxisLabelTL, 
+                       plotTitle = 'A')
+    pTR <- scatterPlot(plotDataTR,  Year,
+                       yaxisLabelTR, 
+                       plotTitle = 'B')
+    pML <- scatterPlot(plotDataML,  Year,
+                       yaxisLabelML, 
+                       plotTitle = 'C')
+    pMR <- scatterPlot(plotDataMR,  Year,
+                       yaxisLabelMR, 
+                       plotTitle = 'D')
+    pBL <- scatterPlot(plotDataBL,  Year,
+                       yaxisLabelBL, 
+                       plotTitle = 'E')
+    
+    thisGraph <-
+      ggpubr::ggarrange(pTL, pTR, pML, pMR, pBL,
+                        ncol = 2, nrow = 3)
+    
+    # Connects to 'png' device for saving plot as .png a file
+    Cairo::CairoPNG(
+      filename = paste0("images/", 
+                        figfilename, ".", 
+                        "png"),
+      width = 3600,
+      height = 3600,
+      dpi = 600,
+      bg = "white"
+    )
+    
+    # Draws the final plot to device
+    plot(thisGraph)
+    
+    # Closes connection to 'png' device
+    dev.off()
+    
+  }
+
+```
+
+```{r dataReading, echo = FALSE}
+
+# Reads data on computers installed by school place by region
+computersInSchoolByPlace <- 
+  readComputersPlaceData("D9 - computers in school by place - 2010","2010")
+computersInSchoolByPlace <-
+  rbind(computersInSchoolByPlace, readComputersPlaceData("D9 - computers in school by place - 2011", "2011"))
+computersInSchoolByPlace <-
+  rbind(computersInSchoolByPlace, readComputersPlaceData("D9 - computers in school by place - 2012", "2012"))
+computersInSchoolByPlace <-
+  rbind(computersInSchoolByPlace, readComputersPlaceData("D9 - computers in school by place - 2013", "2013"))
+write.csv(computersInSchoolByPlace, "data/computersInSchoolByPlace.csv", row.names = FALSE)
+
+# Reads data on user Internet access by place by region
+youngstersInternetAccessByPlace <-
+  readInternetAccessPlace("A2 - youngster internet access by place - 2013", "2013")
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2014", "2014"))
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2015", "2015"))
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2016", "2016"))
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2017", "2017"))
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2018", "2018"))
+youngstersInternetAccessByPlace <-
+  rbind(youngstersInternetAccessByPlace,
+        readInternetAccessPlace("A2 - youngster internet access by place - 2019", "2019"))
+write.csv(youngstersInternetAccessByPlace, "data/youngstersInternetAccessByPlace.csv", row.names = FALSE)
+
+# Reads data on user Internet access by device by region
+youngstersInternetAccessByDevice <-
+  readInternetAccessDeviceData("A1 - youngster internet access by device - 2012", "2012")
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2013", "2013"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2014", "2014"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2015", "2015"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2016", "2016"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2017", "2017"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2018", "2018"))
+youngstersInternetAccessByDevice <-
+    rbind(youngstersInternetAccessByDevice,
+          readInternetAccessDeviceData("A1 - youngster internet access by device - 2019", "2019"))
+write.csv(youngstersInternetAccessByDevice, "data/youngstersInternetAccessByDevice.csv", row.names = FALSE)
+
+# Reads data on household Internet access by class 
+householdsInternetAccessByClass <- 
+  readInternetAccessClassData("A4 - households with internet access by class")
+write.csv(householdsInternetAccessByClass, "data/householdsInternetAccessByClass.csv", row.names = FALSE)
+
+# Reads data on household Internet access by region
+householdsInternetAccessByRegion <- 
+  readInternetAccessRegionData("A4 - households with internet access by region")
+write.csv(householdsInternetAccessByRegion, "data/householdsInternetAccessByRegion.csv", row.names = FALSE)
+
+# Reads data on youngster Internet access by device by activity
+youngstersInternetAccessByActivity <- 
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2012", "2012")
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2013", "2013"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2014", "2014"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2015", "2015"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2016", "2016"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2017", "2017"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2018", "2018"))
+youngstersInternetAccessByActivity <- 
+  rbind(youngstersInternetAccessByActivity,
+  readInternetAccessActivity("B2 - youngster used internet by activity - 2019", "2019"))
+write.csv(youngstersInternetAccessByActivity, "data/youngstersInternetAccessByActivity.csv", row.names = FALSE)
+
+useOfInternet <- readInternetUseData("Use of Internet")
+searchesForBiology <- readInternetUseData("Searches for Biology")
+searchesForChemistry <- readInternetUseData("Searches for Chemistry")
+searchesForMathematics <- readInternetUseData("Searches for Mathematics")
+searchesForGames <- readInternetUseData("Searches for games")
+searchesForGlobo <- readInternetUseData("Searches for globo")
+
+```
+
+```{r plotDrawings, echo = FALSE}
+
+plotRegionalGrid(computersInSchoolByPlace, 
+                 "% of schools", 
+                 "Place",
+                 3,
+                 "Figure3")
+
+plotData(householdsInternetAccessByRegion,
+         "% of households", 
+         "Region",
+         1,
+         "Figure4")
+
+plotRegionalGrid(youngstersInternetAccessByDevice, 
+                 "% of users", 
+                 "Device",
+                 3,
+                 "Figure5")
+
+plotRegionalGrid(youngstersInternetAccessByPlace, 
+                 "% of users", 
+                 "Place",
+                 3,
+                 "Figure6")
+
+plotData(householdsInternetAccessByClass,
+         "% of households", 
+         "Class",
+         1,
+         "Figure7")
+
+plotRegionalGrid(youngstersInternetAccessByActivity, 
+                 "% of users", 
+                 "Activity",
+                 4,
+                 "Figure8")
+
+plotComparativeData(searchesForChemistry, 
+                    "Chemistry",
+                    searchesForMathematics,
+                    "Mathematics", 
+                    searchesForGlobo, 
+                    "globo", 
+                    searchesForGames, 
+                    "games", 
+                    "Figure10")
+
+plotComparativeScat(searchesForBiology, "Biology",
+           searchesForChemistry, "Chemistry",
+           searchesForMathematics, "Mathematics",
+           searchesForGlobo, "Globo",
+           searchesForGames, "games",
+           2013,
+           "Figure11")
+
+```
+
+```{r Table3}
+
+thisTable <- data.frame(
+  Indicator <- character(),
+  W <- numeric(),
+  p <- numeric()
+)
+
+results <- stats::shapiro.test(useOfInternet$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Use of Internet",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+results <- stats::shapiro.test(searchesForBiology$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Searches for 'Biology'",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+results <- stats::shapiro.test(searchesForChemistry$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Searches for 'Chemistry'",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+results <- stats::shapiro.test(searchesForMathematics$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Searches for 'Mathematics'",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+results <- stats::shapiro.test(searchesForGlobo$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Searches for 'Globo'",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+results <- stats::shapiro.test(searchesForGames$Frequency)
+thisTable <-
+  rbind(
+    thisTable,
+    data.frame(Indicator = "Searches for 'games'",
+              W = results$statistic,
+              p = results$p.value)
+  )
+
+
+thisTable$W <- formatC(thisTable$W, format = "f", 2)
+thisTable$p <- formatC(thisTable$p, format = "f", 3)
+
+xlsx::write.xlsx(
+    thisTable,
+    file = "data/Table3.xls",
+    row.names = FALSE,
+    col.names = TRUE
+)
+
+```
+
+```{r Table4}
+
+nonParCorr <- function(datafile, indicatorName) {
+  thisTable <- data.frame(
+    Correlation = character(),
+    Year = integer(),
+    n = integer(),
+    r = numeric(),
+    p = numeric(),
+    tau = numeric(),
+    pk = numeric(),
+    rho = numeric(),
+    ps = numeric()
+  )
+  
+  for (iYear in unique(useOfInternet$Year)) {
+    data <- merge(
+      dplyr::filter(useOfInternet,
+                    Year == iYear),
+      dplyr::filter(datafile,
+                    Year == iYear),
+      by = c("State", "Year")
+    )
+    
+    data <- na.exclude(data)
+    
+    data <- dplyr::select(data, Frequency.x,
+                          Frequency.y)
+    
+    resultsP <- stats::cor.test(
+      data$Frequency.x,
+      data$Frequency.y,
+      method = "pearson",
+      alternative = "two.sided",
+      exact = TRUE
+    )
+    resultsK <- stats::cor.test(
+      data$Frequency.x,
+      data$Frequency.y,
+      method = "kendall",
+      alternative = "two.sided",
+      exact = TRUE
+    )
+    resultsS <- stats::cor.test(
+      data$Frequency.x,
+      data$Frequency.y,
+      method = "spearman",
+      alternative = "two.sided",
+      exact = TRUE
+    )
+    
+    thisTable <-
+      rbind(
+        thisTable,
+        data.frame(
+          Correlation = paste("Searches for", indicatorName),
+          Year = iYear,
+          n = nrow(data),
+          r = resultsP$estimate,
+          p = resultsP$p.value,
+          tau = resultsK$estimate,
+          pk = resultsK$p.value,
+          rho = resultsS$estimate,
+          ps = resultsS$p.value
+        )
+      )
+    
+  }
+  
+  thisTable
+  
+}
+
+thisTable <- data.frame(
+  Correlation = character(),
+  Year = integer(),
+  n = integer(),
+  r = numeric(),
+  p = numeric(),
+  tau = numeric(),
+  pk = numeric(),
+  rho = numeric(),
+  ps = numeric()
+)
+
+thisTable <- 
+  rbind(
+    thisTable,
+    nonParCorr(searchesForBiology, "Biology")
+  )
+thisTable <- 
+  rbind(
+    thisTable,
+    nonParCorr(searchesForChemistry, "Chemistry")
+  )
+thisTable <- 
+  rbind(
+    thisTable,
+    nonParCorr(searchesForMathematics, "Mathematics")
+  )
+thisTable <- 
+  rbind(
+    thisTable,
+    nonParCorr(searchesForGlobo, "Globo")
+  )
+thisTable <- 
+  rbind(
+    thisTable,
+    nonParCorr(searchesForGames, "Games")
+  )
+
+thisTable$r <- formatC(thisTable$r, format = "f", 2)
+thisTable$p <- formatC(thisTable$p, format = "E", 2)
+thisTable$tau <- formatC(thisTable$tau, format = "f", 2)
+thisTable$pk <- formatC(thisTable$pk, format = "E", 2)
+thisTable$rho <- formatC(thisTable$rho, format = "f", 2)
+thisTable$ps <- formatC(thisTable$ps, format = "E", 2)
+
+xlsx::write.xlsx(
+    thisTable,
+    file = "data/Table4.xls",
+    row.names = FALSE,
+    col.names = TRUE
+)
+
+```
+
+```{r Table4B}
+
+  for (iYear in unique(useOfInternet$Year)) {
+
+    data <- dplyr::filter(useOfInternet,
+                          Year == iYear)
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                                 'Use_of_Internet'))
+    data <- merge(data,
+                  dplyr::filter(searchesForBiology,
+                                Year == iYear),
+                  by = c("State", "Year"))
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                    'Searches_for_Biology'))
+    data <- merge(data,
+                  dplyr::filter(searchesForChemistry,
+                                Year == iYear),
+                  by = c("State", "Year"))
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                      'Searches_for_Chemistry'))
+    data <- merge(data,
+                  dplyr::filter(searchesForMathematics,
+                                Year == iYear),
+                  by = c("State", "Year"))
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                       'Searches_for_Mathematics'))
+    data <- merge(data,
+                  dplyr::filter(searchesForGlobo,
+                                Year == iYear),
+                  by = c("State", "Year"))
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                          'Searches_for_Globo'))
+    data <- merge(data,
+                  dplyr::filter(searchesForGames,
+                                Year == iYear),
+                  by = c("State", "Year"))
+    data <-
+      plyr::rename(data,
+                   replace = c('Frequency' =
+                    'Searches_for_games'))
+    
+    Table4APA <- lm(Use_of_Internet ~
+                  Searches_for_Biology +
+                  Searches_for_Chemistry +
+                  Searches_for_Mathematics +
+                  Searches_for_Globo +
+                  Searches_for_games,
+                  data = data)
+    apaTables::apa.reg.table(Table4APA, filename =
+                           paste0("Table4APA", 
+                                  " - ", 
+                                  iYear, 
+                                  ".doc"),
+                         table.number = 4)
+
+}
+
+```
+
+```{r DataLPCC}
+
+library(reshape)
+
+lcorrel <- function(DFrame, bw, Coords) {
+  
+  Dij <- as.matrix(dist(Coords))
+  
+  Obs <- nrow(DFrame)
+  VarNo <- ncol(DFrame)
+  VarSQ <- VarNo ^ 2
+  
+  Ne <- round(Obs * bw, 0)
+  DFS <- Ne - 2
+  
+  MeltMeNames <- melt(cor(DFrame))
+  TNames <- t(paste(MeltMeNames$X1, 
+                    MeltMeNames$X2, 
+                    sep = "_"))
+  
+  cor_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  tv_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  sign_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  BF_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  
+  wtcor_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  gwsign_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  BF_gw_table_out <-
+    as.data.frame(setNames(
+      replicate(VarSQ, numeric(0), simplify = F),
+      TNames[1:VarSQ]))
+  
+  DNames <- names(DFrame)
+  
+  for (m in 1:Obs) {
+    
+    #Get the data
+    DataSet <- data.frame(DFrame, 
+                          DNeighbour = Dij[, m])
+    
+    #Sort by distance
+    DataSetSorted <-
+      DataSet[order(DataSet$DNeighbour), ]
+    
+    #Keep Nearest Neighvbours
+    SubSet1 <- DataSetSorted[1:Ne, ]
+    
+    Kernel_H <- max(SubSet1$DNeighbour)
+    Wts <- (1 - (SubSet1$DNeighbour / Kernel_H)^2)^2
+    
+    #Remove Distance to NN columne
+    SubSet <- SubSet1[, 1:VarNo]
+    
+    #Calculate Correlation Matrix
+    CorMatrix <- cor(SubSet, method = "pearson")
+    
+    t_matrix <-
+      matrix(
+        data = NA,
+        nrow = VarNo,
+        ncol = VarNo,
+        dimnames = list(DNames, DNames)
+      )
+    sig_matrix <-
+      matrix(
+        data = NA,
+        nrow = VarNo,
+        ncol = VarNo,
+        dimnames = list(DNames, DNames)
+      )
+    
+    for (i in 1:VarNo) {
+      for (j in 1:VarNo) {
+        if (j != i) {
+          t_matrix[i, j] <-
+            (CorMatrix[i, j] * sqrt(DFS)) / 
+            (sqrt(1 - (CorMatrix[i, j] ^ 2)))
+          sig_matrix[i, j] <- 
+            2 * (1 - pt(abs(t_matrix[i, j]), 
+                        df = DFS))
+        }
+      }
+    }
+    
+    #Store in table
+    MeltMeV <- melt(CorMatrix)
+    cor_table_out[m, ] <- t(MeltMeV$value)
+    
+    MeltMeTv <- melt(t_matrix)
+    tv_table_out[m, ] <- t(MeltMeTv$value)
+    
+    MeltMeSign <- melt(sig_matrix)
+    sign_table_out[m, ] <- t(MeltMeSign$value)
+    
+    BF_table_out[m, ] <-
+      p.adjust(sign_table_out[m, ], 
+               method = "bonferroni", 
+               n = Obs)
+    
+  }
+  
+  lcor.results <-
+    list(
+      LPCC = cor_table_out,
+      LPCC_t = tv_table_out,
+      LPCC_sig = sign_table_out,
+      LPCC_sig_BF = BF_table_out
+    )
+  
+  return(lcor.results)
+  
+}
+
+mc.lcorrel <- function(Nsim = 99, bwSIM, CorVars, Coord.X, Coord.Y) {
+
+  lcorSIM <- matrix(data = NA,
+                    nrow = Nsim,
+                    ncol = 6)
+  
+  Obs <- nrow(CorVars)
+  
+  Coords <- cbind(Coord.X, Coord.Y)
+  
+  lcc0 <- lcorrel(CorVars, bwSIM, Coords)
+  Obs.var.lpcc <- var(lcc0$LPCC[, 2])
+
+  for (i in 1:Nsim) {
+    lccSIM <- lcorrel(CorVars, 
+                      bwSIM, 
+                      Coords[sample(nrow(Coords)), ])
+    
+    lcorSIM[i, 1] <- i
+    lcorSIM[i, 2] <- mean(lccSIM$LPCC[, 2])
+    lcorSIM[i, 3] <- min(lccSIM$LPCC[, 2])
+    lcorSIM[i, 4] <- max(lccSIM$LPCC[, 2])
+    lcorSIM[i, 5] <- var(lccSIM$LPCC[, 2])
+    
+    if (lcorSIM[i, 5] >= Obs.var.lpcc) {
+      lcorSIM[i, 6] <- 1
+    }
+    else
+    {
+      lcorSIM[i, 6] <- 0
+    }
+    
+  }
+  
+  C.test.lp <- sum(lcorSIM[, 6])
+
+  if ((Nsim - C.test.lp) < C.test.lp) {
+    C.test.lp = Nsim - C.test.lp
+  }
+
+  pseudo.p.lpcc = (1 + C.test.lp) / (Nsim + 1)
+
+  SIMs <-
+    data.frame(
+      SIM.ID = lcorSIM[, 1],
+      SIM.meanLPCC = lcorSIM[, 2],
+      SIM.minLPCC = lcorSIM[, 3],
+      SIM.maxLPCC = lcorSIM[, 4],
+      SIM.varLPCC = lcorSIM[, 5],
+      SIM.extrLPCC = lcorSIM[, 6]
+    )
+  
+  return(list(
+    SIM = SIMs,
+    LC.Obs = lcc0,
+    pseudo.p.lpcc = pseudo.p.lpcc
+  ))
+  
+}
+
+DataLPCC <- function(datafile, iYear) {
+  
+    data <- merge(
+      dplyr::filter(useOfInternet,
+                    Year == iYear),
+      dplyr::filter(datafile,
+                    Year == iYear),
+      by = c("State", "Year")
+    )
+    
+    data <- dplyr::select(data, State, Frequency.x,
+                          Frequency.y)
+    
+    data <-
+      merge(brCentroids,
+            data,
+            by = "State")
+    data <- dplyr::filter(data, !is.na(Frequency.y))
+    
+    n <- nrow(data)
+    
+    Bandwidth <- 1 / 2
+    
+    thisMC <-
+      mc.lcorrel(
+        Nsim = 19,
+        bwSIM = Bandwidth,
+        CorVars = data.frame(X1 = data$Frequency.x,
+                             X2 = data$Frequency.y),
+        Coord.X = data$long,
+        Coord.Y = data$lat
+      )
+    
+    LPCC <-
+      data.frame(
+        Year = iYear,
+        State = data$State,
+        LPCC =
+          thisMC$LC.Obs['LPCC']$LPCC$X1_X2,
+        LPCC_t =
+          thisMC$LC.Obs['LPCC_t']$LPCC_t$X1_X2,
+        LPCC_sig_BF =
+          thisMC$LC.Obs['LPCC_sig_BF']$LPCC_sig_BF$X1_X2,
+        stringsAsFactors = FALSE
+      )
+    
+    n <- n
+    
+    p <- thisMC$pseudo.p.lpcc
+    
+    share <-
+      scales::percent(nrow(dplyr::select(
+        dplyr::filter(LPCC, LPCC_sig_BF <=
+                        0.05),
+        LPCC_sig_BF)) /
+          nrow(dplyr::select(LPCC,
+                               LPCC_sig_BF)),
+        accuracy = 0.1)
+    
+    range <- dplyr::select(
+      dplyr::filter(LPCC, LPCC_sig_BF <= 0.05),
+      LPCC)
+    if (nrow(range) > 0) {
+      range <- range(dplyr::select(dplyr::filter(LPCC,
+        LPCC_sig_BF <= 0.05), LPCC))
+      range <- formatC(range, format = "f", 2)
+      range <- paste(range[1], ", ", range[2])
+      } else {
+        range <- "--"
+      }
+    
+  RPushbullet::pbPost(
+    type = "note",
+    title = paste(deparse(substitute(datafile)), 
+                  "finished!"),
+    body = paste(
+      "bw =",
+      formatC(Bandwidth, format = "E", 1),
+      "n= ",
+      n,
+      "; share = ",
+      share,
+      "; range = ",
+      range
+    ),
+    apikey = "o.SYjKv7goGyRzOWif4k8hwA6wPw1Hg00q",
+    devices = "Galaxy A8"
+  )
+  
+  return(list(Year = iYear,
+              LPCC = LPCC,
+              n = n,
+              p = p,
+              share = share,
+              range = range))
+
+}
+
+```
+
+```{r Table5}
+
+Table5 <-
+  data.frame(
+    Indic = character(),
+    Year = integer(),
+    n = integer(),
+    share = character(),
+    range = character(),
+    stringsAsFactors = FALSE
+  )
+BiologyLPCC <-
+  data.frame(
+    Year = integer(),
+    State = character(),
+    LPCC = numeric(),
+    LPCC_t = numeric(),
+    LPCC_sig_BF = numeric()
+  )
+ChemistryLPCC <-
+  data.frame(
+    Year = integer(),
+    State = character(),
+    LPCC = numeric(),
+    LPCC_t = numeric(),
+    LPCC_sig_BF = numeric()
+  )
+MathematicsLPCC <-
+  data.frame(
+    Year = integer(),
+    State = character(),
+    LPCC = numeric(),
+    LPCC_t = numeric(),
+    LPCC_sig_BF = numeric()
+  )
+GloboLPCC <-
+  data.frame(
+    Year = integer(),
+    State = character(),
+    LPCC = numeric(),
+    LPCC_t = numeric(),
+    LPCC_sig_BF = numeric()
+  )
+GamesLPCC <-
+  data.frame(
+    Year = integer(),
+    State = character(),
+    LPCC = numeric(),
+    LPCC_t = numeric(),
+    LPCC_sig_BF = numeric()
+  )
+
+for (iYear in unique(useOfInternet$Year)) {
+  
+  results <-  DataLPCC(searchesForBiology, iYear)
+  Table5 <-
+    rbind(
+      Table5,
+      data.frame(
+        Indic = "UseOfInternet vs Biology",
+        Year = iYear,
+        n = unname(unlist(results['n'])),
+        share = unname(unlist(results['share'])),
+        range = unname(unlist(results['range'])),
+        stringsAsFactors = FALSE
+      )
+    )
+  BiologyLPCC <-
+    rbind(BiologyLPCC, results$LPCC)
+  
+  results <-  DataLPCC(searchesForChemistry, iYear)
+  Table5 <-
+    rbind(
+      Table5,
+      data.frame(
+        Indic = "UseOfInternet vs Chemistry",
+        Year = iYear,
+        n = unname(unlist(results['n'])),
+        share = unname(unlist(results['share'])),
+        range = unname(unlist(results['range'])),
+        stringsAsFactors = FALSE
+      )
+    )
+  ChemistryLPCC <-
+    rbind(ChemistryLPCC, results$LPCC)
+  
+  results <-  DataLPCC(searchesForMathematics, iYear)
+  Table5 <-
+    rbind(
+      Table5,
+      data.frame(
+        Indic = "UseOfInternet vs Mathematics",
+        Year = iYear,
+        n = unname(unlist(results['n'])),
+        share = unname(unlist(results['share'])),
+        range = unname(unlist(results['range'])),
+        stringsAsFactors = FALSE
+      )
+    )
+  MathematicsLPCC <-
+    rbind(MathematicsLPCC, results$LPCC)
+  
+  results <-  DataLPCC(searchesForGlobo, iYear)
+  Table5 <-
+    rbind(
+      Table5,
+      data.frame(
+        Indic = "UseOfInternet vs Globo",
+        Year = iYear,
+        n = unname(unlist(results['n'])),
+        share = unname(unlist(results['share'])),
+        range = unname(unlist(results['range'])),
+        stringsAsFactors = FALSE
+      )
+    )
+  GloboLPCC <-
+    rbind(GloboLPCC, results$LPCC)
+  
+  results <-  DataLPCC(searchesForGames, iYear)
+  Table5 <-
+    rbind(
+      Table5,
+      data.frame(
+        Indic = "UseOfInternet vs games",
+        Year = iYear,
+        n = unname(unlist(results['n'])),
+        share = unname(unlist(results['share'])),
+        range = unname(unlist(results['range'])),
+        stringsAsFactors = FALSE
+      )
+    )
+  GamesLPCC <-
+    rbind(GamesLPCC, results$LPCC)
+  
+}
+
+Table5 <- Table5[order(Table5$Indic),]
+
+xlsx::write.xlsx(
+    Table5,
+    file = "data/Table5.xls",
+    row.names = FALSE,
+    col.names = TRUE
+)
+
+save.image("~/My Work/Meus trabalhos/Computers & Education/Evidence of a Second-level Digital Divide/.RData")
+
+```
+
+```{r histPlot}
+library(ggpubr)
+
+histPlot <- function(plotData, plotTitle) {
+  
+  data <-
+    dplyr::filter(plotData,
+                  LPCC_sig_BF <= 0.05)
+  
+  thisGraph <-
+    ggplot(data,
+           aes(LPCC))
+  
+  thisGraph <- thisGraph +
+    geom_histogram(aes(y = stat(width * density)),
+                   bins = 30,
+                   fill = "dodgerblue",
+                   color="black")
+  
+  thisGraph <- thisGraph + 
+    theme(
+      panel.background = element_rect(fill = "white",
+                                      colour = "white"),
+      panel.border = element_blank(),
+      panel.grid.major = element_line(colour = "grey80"),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(size = 9),
+      axis.title = element_text(size = 11, face = "bold")
+    )
+  
+  thisGraph <- thisGraph +
+    scale_x_continuous(labels =                         scales::number_format(accuracy = 0.1))
+  thisGraph <- thisGraph +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+  
+  thisGraph <- thisGraph +
+    labs(x = expression(r ~ " (" ~ p <= 0.5 ~ ")"),
+         y = "rel. freq.")
+  
+  thisGraph <- thisGraph +
+    ggtitle(plotTitle)
+  
+  thisGraph
+  
+}
+
+plotComparativeHist <-
+  function(plotDataTL,
+           plotDataTR,
+           plotDataML,
+           plotDataMR,
+           plotDataBL,
+           figfilename) {
+    
+  # Make histogram plots
+  pTL <- histPlot(plotDataTL, 'A')
+  pTR <- histPlot(plotDataTR, 'B')
+  pML <- histPlot(plotDataML, 'C')
+  pMR <- histPlot(plotDataMR, 'D')
+  pBL <- histPlot(plotDataBL, 'E')
+
+  thisGraph <- ggpubr::ggarrange(pTL, pTR, pML, pMR, pBL,
+                       ncol = 2, nrow = 3
+  )
+  
+  # Connects to 'png' device for saving plot as .png a file
+  Cairo::CairoPNG(
+    filename = paste0("images/", figfilename, ".", "png"),
+    width = 3600,
+    height = 3600,
+    dpi = 600,
+    bg = "white"
+  )
+  
+  # Draws the final plot to device
+  plot(thisGraph)
+  
+  # Closes connection to 'png' device
+  dev.off()
+
+}
+
+```
+
+```{r plotComparativeHist}
+
+plotComparativeHist(BiologyLPCC,
+                    ChemistryLPCC,
+                    MathematicsLPCC,
+                    GloboLPCC,
+                    GamesLPCC,
+                    "Figure12")
+
+```
+
+```{r data for ChoroMaps}
+
+data <- useOfInternet
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Use_of_Internet'))
+data <- merge(data,
+              searchesForBiology,
+              by = c("State", "Year"))
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Searches_for_Biology'))
+data <- merge(data,
+              searchesForChemistry,
+              by = c("State", "Year"))
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Searches_for_Chemistry'))
+data <- merge(data,
+              searchesForMathematics,
+              by = c("State", "Year"))
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Searches_for_Mathematics'))
+data <- merge(data,
+              searchesForGlobo,
+              by = c("State", "Year"))
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Searches_for_Globo'))
+data <- merge(data,
+              searchesForGames,
+              by = c("State", "Year"))
+data <-
+  plyr::rename(data,
+               replace = c('Frequency' =
+                             'Searches_for_games'))
+data <-
+  plyr::rename(data,
+               replace = c('State' =
+                             'id'))
+
+```
+
+```{r choroplMaps}
+
+library(ggplot2)
+library(colorplaner)
+library(mapproj)
+library(grid)
+
+scale_x_longitude <- function(xmin = -180,
+                              xmax = 180,
+                              step = 1,
+                              ...) {
+  xbreaks <- seq(xmin, xmax, step)
+  xlabels <-
+    unlist(lapply(xbreaks, function(x)
+      ifelse(
+        x < 0, parse(text = paste0(-x, "^o", "*W")),
+        ifelse(x > 0, parse(text = paste0(x, "^o", "*E")),
+               x)
+      )))
+  return(scale_x_continuous(
+    "Longitude",
+    breaks = xbreaks,
+    labels = xlabels,
+    expand = c(0, 0),
+    ...
+  ))
+}
+
+scale_y_latitude <- function(ymin = -90,
+                             ymax = 90,
+                             step = 0.5,
+                             ...) {
+  ybreaks <- seq(ymin, ymax, step)
+  ylabels <-
+    unlist(lapply(ybreaks, function(x)
+      ifelse(
+        x < 0, parse(text = paste0(-x, "^o", "*S")),
+        ifelse(x > 0, parse(text = paste0(x, "^o", "*N")),
+               x)
+      )))
+  return(scale_y_continuous(
+    "Latitude",
+    breaks = ybreaks,
+    labels = ylabels,
+    expand = c(0, 0),
+    ...
+  ))
+}
+
+choroplMap <-
+  function(datafile,
+           iYear,
+           yVar,
+           yVarName) {
+
+    # Filter the data for the desired year while removing NA values
+    plotdata <- dplyr::filter(datafile,
+                              Year == iYear &
+                                !is.na('Use_of_Internet') &
+                                !is.na(yVar))
+    
+    choroMap <- ggplot(data = plotdata)
+    
+    # Map the the values associated with each polygon (region) to the
+    # coordinates of each polygon (positions),  by means of the linking
+    # variable
+    choroMap <- choroMap + 
+      geom_map(
+        aes(
+          map_id = id,
+          fill = plotdata[, 'Use_of_Internet'],
+          fill2 = plotdata[, yVar]
+          ),
+        map = brStatesDF,
+        color = 'NA'
+        ) 
+    
+    # Map the two continuous variables into a single display color
+    choroMap <- choroMap + 
+      scale_fill_colorplane(
+        axis_title = "Use of Internet",
+        axis_title_y = yVarName,
+        na.color = "white",
+        color_projection = "YUV",
+        Y = 0.4,
+        guide = "colorplane"
+      )
+    
+    # Further manipulate the guide generated for the choropleth map
+    choroMap <- choroMap +
+      guides(
+        fill = guide_colorplane(
+          planewidth = 5, # Make the guide 50% the size of the maps
+          planeheight = 5, # Make the guide 50% the size of the maps
+          axis.title.theme = element_text(size = 8),
+          axis.title.y.theme = element_text(size = 8),
+          fill2 = FALSE
+        )
+      )
+
+    # Expand the plot limits, using atitude & longitude data
+    choroMap <- choroMap + 
+      expand_limits(x = brStatesDF$long,
+                    y = brStatesDF$lat)
+    
+    # Make the map projection
+    choroMap <- choroMap + coord_map()
+    
+    # Position scales for latitude & longitude data
+    choroMap <- choroMap + 
+      scale_x_longitude(xmin = -80,
+                        xmax = -30,
+                        step = 10)
+    choroMap <- choroMap + 
+      scale_y_latitude(ymin = -40,
+                       ymax = +10,
+                       step = 10)
+    
+    # Add a title above the map
+    choroMap <- choroMap +
+        ggtitle(iYear)
+    
+    # Modify components of the theme used for the map
+    choroMap <- choroMap +
+      theme(
+        line = element_line(colour = "grey95"),
+        plot.background = 
+          element_rect(fill = "white",
+                       colour = "white"),
+        panel.background = 
+          element_rect(fill = "white",
+                       colour = "white"),
+        panel.grid = 
+          element_line(colour = "grey95"),
+        plot.title = element_text(size = 12,
+                                  face = "bold"),
+        legend.position = "bottom",
+        plot.margin = unit(c(1, 1, 1, 1), "lines")
+      )
+    
+    # Add a scale bar to the map
+    choroMap <- choroMap +
+      ggsn::scalebar(
+        brStatesDF,
+        x.min = -80,
+        x.max = -30,
+        y.min = -40,
+        y.max = +10,
+        dist = 500,
+        dist_unit = "km",
+        location = "bottomright",
+        anchor = c(x = -37, y = -30),
+        transform = TRUE,
+        model = 'WGS84',
+        st.size = 2,
+        border.size = 0.5
+      )
+    
+    # # Add a north symbol to the map
+    # choroMap <- choroMap +
+    #   ggsn::north(
+    #     data = plotdata,
+    #     scale = 0.15,
+    #     location = 'topright',
+    #     symbol = 3
+    #   )
+    
+    choroMap
+    
+  }
+
+plotComparativeChoro <-
+  function(plotData,
+           yVar, yvarName,
+           figfilename) {
+    
+  # Make choroplet maps
+    pTL <- choroplMap(plotData, 2005, yVar, yvarName)
+    pTR <- choroplMap(plotData, 2008, yVar, yvarName)
+    pML <- choroplMap(plotData, 2011, yVar, yvarName)
+    pMR <- choroplMap(plotData, 2013, yVar, yvarName)
+
+    thisGraph <- 
+      ggpubr::ggarrange(pTL, pTR,
+                        pML, pMR, 
+                        ncol = 2,
+                        nrow = 2,
+                        common.legend = TRUE,
+                        legend = "bottom"
+                        )
+    
+    thisGraph <- thisGraph +
+      ggtitle(paste("Access to Internet vs", yvarName))
+    
+  # Connects to 'png' device for saving plot as .png a file
+  Cairo::CairoPNG(
+    filename = paste0("images/", 
+                      figfilename, 
+                      ".", 
+                      "png"),
+    width = 3600,
+    height = 5000,
+    dpi = 600,
+    bg = "white"
+  )
+  
+  # Draws the final plot to device
+  plot(thisGraph)
+  
+  # Closes connection to 'png' device
+  dev.off()
+
+}
+
+```
+
+```{r ComparativeChoro}
+
+plotComparativeChoro(data,
+                     'Searches_for_Biology', 
+                     "Searches for Biology",
+                     "Figure12"
+)
+plotComparativeChoro(data,
+                     'Searches_for_Chemistry', 
+                     "Searches for Chemistry",
+                     "Figure13"
+)
+plotComparativeChoro(data,
+                     'Searches_for_Mathematics', 
+                     "Searches for Mathematics",
+                     "Figure14"
+)
+plotComparativeChoro(data,
+                     'Searches_for_Globo', 
+                     "Searches for Globo",
+                     "Figure15"
+)
+plotComparativeChoro(data,
+                     'Searches_for_games', 
+                     "Searches for games",
+                     "Figure16"
+)
+
+```
+
+
+```{r correlUseData, echo = FALSE}
+
+correlUseData <- function(datafile, searchTerm) {
+  data <-
+    merge(
+    dplyr::select(useOfInternetCorr, State, '2005', '2008', '2011', '2013'),
+      dplyr::select(datafile, State, '2005', '2008', '2011', '2013'),
+      by = "State",
+      suffixes = c(".Users", paste0(".", searchTerm))
+    )
+  
+  data$r1 <- 0
+  data$p1 <- 0
+  data$r2 <- 0
+  data$p2 <- 0
+  data$r3 <- 0
+  data$p3 <- 0
+  
+  for (i in 1:nrow(data)) {
+    if (sum(is.na(data[i, 6:8])) == 0) {
+      values <-
+        cor.test(as.numeric(data[i, 2:4]),
+                 as.numeric(data[i, 6:8]),
+                 method = "pearson")
+      data$r1[i] <- unname(values$estimate)
+      data$p1[i] <- values$p.value
+    } else {
+      data$r1[i] <- NA
+      data$p1[i] <- NA
+    }
+  }
+  
+  for (i in 1:nrow(data)) {
+    if (sum(is.na(data[i, 7:9])) == 0) {
+      values <-
+        cor.test(as.numeric(data[i, 2:4]),
+                 as.numeric(data[i, 7:9]),
+                 method = "pearson")
+      data$r2[i] <- unname(values$estimate)
+      data$p2[i] <- values$p.value
+    } else {
+      data$r2[i] <- NA
+      data$p2[i] <- NA
+    }
+  }
+  
+  for (i in 1:nrow(data)) {
+    if (sum(is.na(data[i, 6:9])) == 0) {
+      values <-
+        cor.test(as.numeric(data[i, 2:5]),
+                 as.numeric(data[i, 6:9]),
+                 method = "pearson")
+      data$r3[i] <- unname(values$estimate)
+      data$p3[i] <- values$p.value
+    } else {
+      data$r3[i] <- NA
+      data$p3[i] <- NA
+    }
+  }
+  
+  data
+  
+}
+
+```
+
+```{r mapData, echo = FALSE}
+
+# read administrative boundaries (change folder appropriately)
+brStates <- readOGR("data/BRASIL.shp", verbose = FALSE)
+
+#convert shp to UTF8
+brStates$ESTADO <- toUTF8(brStates$ESTADO, "IBM850")
+
+# convert shp data to data frame for ggplot
+brStates <-
+  gBuffer(brStates, width = 0, byid = TRUE) #correct TopologyException problem
+brStatesDF <- fortify(brStates, region = "UF")
+brStatesDF <- brStatesDF[order(brStatesDF$order), ]
+
+brCentroids <- utils::read.csv(
+  file = paste0("data/BRASILCentroids.csv"),
+  header = TRUE,
+  sep = ",",
+  na.strings = "-",
+  stringsAsFactors = FALSE
+)
+brCentroids <- plyr::rename(brCentroids, replace = c("lon" = "long"))
+
+```
+
+```{r Gini, echo = FALSE}
+
+DataGini <- function(datafile) {
+  thisTable <-
+    data.frame(
+      Year = integer(),
+      n = integer(),
+      Gini = numeric(),
+      gw.frac = numeric(),
+      ns.frac = numeric(),
+      p = numeric(),
+      Moran.I = numeric(),
+      EI = numeric(),
+      z.res = numeric(),
+      z.rand = numeric(),
+      p.rsamp = numeric(),
+      p.rand = numeric()
+    )
+  
+  for (iYear in unique(useOfInternet$Year)) {
+    data <-
+      merge(brCentroids,
+            dplyr::filter(datafile, Year == iYear &
+                            !is.na(Frequency)),
+            by = "State")
+    Bandwidth <- min(36, nrow(data) - 1)
+    
+    thisMoran <-
+      lctools::moransI(
+        Coords = cbind(data$lat, data$long),
+        Bandwidth,
+        x = data$Frequency,
+        WType = 'Bi-square'
+      )
+    
+    thisGini <-
+      lctools::spGini(
+        Coords = cbind(data$lat, data$long),
+        Bandwidth,
+        x = data$Frequency,
+        WType = 'Bi-square'
+      )
+    
+    thisMC <-
+      lctools::mc.spGini(
+        Nsim = 19,
+        Bandwidth,
+        x = data$Frequency,
+        Coord.X = data$lat,
+        Coord.Y = data$long,
+        WType = 'Bi-square'
+      )
+    
+    thisTable <-
+      rbind(
+        thisTable,
+        data.frame(
+          Year = iYear,
+          n = nrow(data),
+          Gini = unname(thisGini["Gini"]),
+          gw.frac = unname(thisGini["gwGini.frac"]),
+          ns.frac = unname(thisGini["nsGini.frac"]),
+          p = thisMC$pseudo.p,
+          Moran.I = thisMoran$Morans.I,
+          EI = thisMoran$Expected.I,
+          z.res = thisMoran$z.resampling,
+          z.rand = thisMoran$z.randomization,
+          p.rsamp = thisMoran$p.value.resampling,
+          p.rand = thisMoran$p.value.randomization
+        )
+      )
+    
+  }
+  
+  thisTable
+  
+}
+
+```
+
+```{r giniTables, echo = FALSE}
+
+useOfInternetGini <- 
+  DataGini(useOfInternet)
+searchesForBiologyGini <- 
+  DataGini(searchesForBiology)
+searchesForChemistryGini <- 
+  DataGini(searchesForChemistry)
+searchesForMathematicsGini <- 
+  DataGini(searchesForMathematics)
+searchesForGloboGini <- 
+  DataGini(searchesForGlobo)
+searchesForGamesGini <- 
+  DataGini(searchesForGames)
+
+GiniTable <-
+  data.frame(
+    Indic = c(
+      rep("Use of Internet", 4),
+      rep("Biology", 4),
+      rep("Chemistry", 4),
+      rep("Mathematics", 4),
+      rep("Globo", 4),
+      rep("games", 4)
+    ),
+    stringsAsFactors = FALSE
+  )
+GiniTable <-
+  cbind(
+    GiniTable,
+    rbind(
+      useOfInternetGini,
+      searchesForBiologyGini,
+      searchesForChemistryGini,
+      searchesForMathematicsGini,
+      searchesForGloboGini,
+      searchesForGamesGini
+    )
+  )
+xlsx::write.xlsx(
+  data.frame(
+    Indic = GiniTable$Indic,
+    Year = GiniTable$Year,
+    n = GiniTable$n,
+    Gini = formatC(GiniTable$Gini, format = "f", 2),
+    gw.frac = formatC(GiniTable$gw.frac, format = "E", 1),
+    ns.frac = formatC(GiniTable$ns.frac, format = "f", 3),
+    p = formatC(GiniTable$p, format = "f", 2),
+    Moran.I = formatC(GiniTable$Moran.I, format = "E", 1),
+    EI = formatC(GiniTable$EI, format = "E", 1),
+    z.res = formatC(GiniTable$z.res, format = "f", 2),
+    z.rand = formatC(GiniTable$z.rand, format = "f", 2),
+    p.rsamp = formatC(GiniTable$p.rsamp, format = "E", 1),
+    p.rand = formatC(GiniTable$p.rand, format = "E", 1)
+  ),
+  file = "data/Table2.xls",
+  row.names = FALSE,
+  col.names = TRUE
+)
+
+```
+
