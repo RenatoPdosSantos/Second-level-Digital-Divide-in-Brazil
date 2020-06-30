@@ -7,8 +7,8 @@ output:
   word_document: default
 ---
 ##Abstract
-While the use of the Internet became ubiquitous in students' lives, mainly for entertainment purposes, access in schools has been drastically reduced in Brazil. Unlike previous studies, this research used choropleth maps to analyze graphically the actual usage of youth-oriented educational and entertainment websites in Brazil in the period 2005-2015 by region and social class to veri-fy whether the increasing Internet access helps to reproduce or close those educational inequalities. Results suggest that by removing the much-needed cultivation of the technological capital in its students, the school system in Brazil is failing to play its crucial role in helping reduce the widening of a second-level digital divide. Brazilian policymakers should incentivize school-based digital activities and behaviors that promote more productive Internet uses.
-##Keywords: Brazil, Google Trends, Internet access, Second-level Digital Divide, Web searches studies
+Background: While Brazilian governmental initiatives focused on home broadband Internet access, availability of computers for students in schools has been drastically reduced since 2010. Furthermore, schools usually prohibits mobile Internet access in its premises, contrarily to the migration of students’ access to smartphones.  Objectives: This study investigates the impact of the increasing home and mobile Internet access on the existing educational inequalities. Design: This study made use of quantitative, locally statistical research to investigate the reproduction or closing of existing educational digital divide across already contrasting Brazilian regions. Setting and Participants: Child or adolescent from 9 to 17 years of age and their guardians, interviewed by CETIC.br. Data collection and analysis: Data was obtained from the CETIC.br data portal and the Google Trends webpage. Data were analysed by means of local geostatistical measures of spatial autocorrelation and inequality, as well as bivariate choropleth maps. Results: Our results suggest that the Brazilian school system is failing to cultivate in their students the more productive use of Internet access and therefore contributing to the widening of the existing second-level digital divide between regions and social classes. Conclusions: This digital divide was critically exacerbated by the arrival of the ongoing COVID-19 pandemic and the suspension of presential classes. Brazilian policymakers should concentrate efforts and resources in addressing this large-scale second-level digital divide, possibly by equipping educators and students with the knowledge and skills towards the educational, productive and responsible use of the Internet, as well as allowing mobile Internet access in school premises.
+##Keywords: Brazil; second-level digital divide; Google Trends; Internet access; Internet use
 
 ##Introduction
 The so-called information technology (ICT) revolution is mainly due to the increasing availability of personal computers and the consequent extraordinary growth of people's access to the Internet. However, this access has not been egalitarian and has widened the gap between those who have access to information and communication technologies and those who, for socioeconomic or geographical reasons, do not have it, which is referred to by the term 'digital divide'. This concept may apply to the gap in Internet access between industrialised and developing societies, called "global divide", or the gap in Internet access between rich and poor in the same country, called social divide (OECD, 2001). Since this unequal access to the Internet is widely considered to be the creator of a new class division between the "information rich" and the "information poor" (Everett, 1998), both global and social forms of digital inequality have attracted the attention of policy makers and researchers in social development, political change, and economic growth (Mour?o & Wood, 2015).
@@ -47,22 +47,9 @@ silentLoad <- function(pckg) {
 ```
 
 ```{r packages, echo = FALSE, warning = FALSE}
-# silentLoad("basicTrendline") # Add Trendline and Confidence Interval of Basic Regression Models to Plot
+
 silentLoad("Cairo") # Library for  high-quality output
-# silentLoad("colorRamps") # Buplyilds color tables
-# silentLoad("cowplot")  # Streamlined plot theme and plot annotations for 'ggplot2'
-# silentLoad("descr") # Descriptive Statistics
-# silentLoad("dplyr") # A grammar of data manipulation
 silentLoad("ggplot2") # Elegant data visualisations using the grammar of graphics
-# silentLoad("ggsn") # North Symbols and Scale Bars for Maps Created with 'ggplot2' or 'ggmap'
-# silentLoad("ggpubr") # Arrange multiple ggplots on the same page
-# silentLoad("gridExtra") # Arrange multiple grid-based plots on a page, and draw tables
-# silentLoad("lctools") # Tools for key spatial statistics and spatial analysissilentLoad("lctools")
-# silentLoad("rgdal") # Bindings for the Geospatial Data Abstraction Library
-# silentLoad("rgeos") # Interface to Geometry Engine - Open Source ('GEOS')
-# silentLoad("scales") # Scale functions for visualization
-# silentLoad("stats") #  Functions for statistical calculations
-# silentLoad("tidyr") # Data tidying
 
 ```
 
@@ -1748,6 +1735,7 @@ xlsx::write.xlsx(
 ```
 
 ```{r histPlot}
+
 library(ggpubr)
 
 histPlot <- function(plotData, plotTitle) {
@@ -1778,7 +1766,7 @@ histPlot <- function(plotData, plotTitle) {
     )
   
   thisGraph <- thisGraph +
-    scale_x_continuous(labels =                         scales::number_format(accuracy = 0.1))
+    scale_x_continuous(labels = scales::number_format(accuracy = 0.1))
   thisGraph <- thisGraph +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1))
   
