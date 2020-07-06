@@ -2227,13 +2227,7 @@ DataGini <- function(datafile) {
       Gini = numeric(),
       gw.frac = numeric(),
       ns.frac = numeric(),
-      p = numeric(),
-      Moran.I = numeric(),
-      EI = numeric(),
-      z.res = numeric(),
-      z.rand = numeric(),
-      p.rsamp = numeric(),
-      p.rand = numeric()
+      p = numeric()
     )
   
   for (iYear in unique(useOfInternet$Year)) {
@@ -2243,14 +2237,6 @@ DataGini <- function(datafile) {
                             !is.na(Frequency)),
             by = "State")
     Bandwidth <- min(36, nrow(data) - 1)
-    
-    thisMoran <-
-      lctools::moransI(
-        Coords = cbind(data$lat, data$long),
-        Bandwidth,
-        x = data$Frequency,
-        WType = 'Bi-square'
-      )
     
     thisGini <-
       lctools::spGini(
@@ -2279,7 +2265,51 @@ DataGini <- function(datafile) {
           Gini = unname(thisGini["Gini"]),
           gw.frac = unname(thisGini["gwGini.frac"]),
           ns.frac = unname(thisGini["nsGini.frac"]),
-          p = thisMC$pseudo.p,
+          p = thisMC$pseudo.p
+        )
+      )
+    
+  }
+  
+  thisTable
+  
+}
+
+DataMoran <- function(datafile) {
+  thisTable <-
+    data.frame(
+      Year = integer(),
+      n = integer(),
+      Moran.I = numeric(),
+      EI = numeric(),
+      z.res = numeric(),
+      z.rand = numeric(),
+      p.rsamp = numeric(),
+      p.rand = numeric()
+    )
+  
+  for (iYear in unique(useOfInternet$Year)) {
+    data <-
+      merge(brCentroids,
+            dplyr::filter(datafile, Year == iYear &
+                            !is.na(Frequency)),
+            by = "State")
+    Bandwidth <- min(36, nrow(data) - 1)
+    
+    thisMoran <-
+      lctools::moransI(
+        Coords = cbind(data$lat, data$long),
+        Bandwidth,
+        x = data$Frequency,
+        WType = 'Bi-square'
+      )
+
+    thisTable <-
+      rbind(
+        thisTable,
+        data.frame(
+          Year = iYear,
+          n = nrow(data),
           Moran.I = thisMoran$Morans.I,
           EI = thisMoran$Expected.I,
           z.res = thisMoran$z.resampling,
@@ -2344,7 +2374,56 @@ xlsx::write.xlsx(
     Gini = formatC(GiniTable$Gini, format = "f", 2),
     gw.frac = formatC(GiniTable$gw.frac, format = "E", 1),
     ns.frac = formatC(GiniTable$ns.frac, format = "f", 3),
-    p = formatC(GiniTable$p, format = "f", 2),
+    p = formatC(GiniTable$p, format = "f", 2)
+  ),
+  file = "data/Table1.xls",
+  row.names = FALSE,
+  col.names = TRUE
+)
+
+useOfInternetMoran <- 
+  DataMoran(useOfInternet)
+searchesForBiologyMoran <- 
+  DataMoran(searchesForBiology)
+searchesForChemistryMoran <- 
+  DataMoran(searchesForChemistry)
+searchesForMathematicsMoran <- 
+  DataMoran(searchesForMathematics)
+searchesForGloboMoran <- 
+  DataMoran(searchesForGlobo)
+searchesForGamesMoran <- 
+  DataMoran(searchesForGames)
+
+MoranTable <-
+  data.frame(
+    Indic = c(
+      rep("Use of Internet", 4),
+      rep("Biology", 4),
+      rep("Chemistry", 4),
+      rep("Mathematics", 4),
+      rep("Globo", 4),
+      rep("games", 4)
+    ),
+    stringsAsFactors = FALSE
+  )
+MoranTable <-
+  cbind(
+    MoranTable,
+    rbind(
+      useOfInternetMoran,
+      searchesForBiologyMoran,
+      searchesForChemistryMoran,
+      searchesForMathematicsMoran,
+      searchesForGloboMoran,
+      searchesForGamesMoran
+    )
+  )
+
+xlsx::write.xlsx(
+  data.frame(
+    Indic = GiniTable$Indic,
+    Year = GiniTable$Year,
+    n = GiniTable$n,
     Moran.I = formatC(GiniTable$Moran.I, format = "E", 1),
     EI = formatC(GiniTable$EI, format = "E", 1),
     z.res = formatC(GiniTable$z.res, format = "f", 2),
@@ -2358,4 +2437,3 @@ xlsx::write.xlsx(
 )
 
 ```
-
